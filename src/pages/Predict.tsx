@@ -285,7 +285,7 @@ case 6: {
   );
 }
 
-// Step 7 - Best Strike Rate (same batting pool)
+// Step 7 - Most sixes (same batting pool)
 case 7: {
   const battingPool = Object.fromEntries(
     Object.keys(batters).map(teamId => [
@@ -294,7 +294,7 @@ case 7: {
     ])
   );
   return (
-    <StepWrapper stepKey={7} title="Best Strike Rate ⚡" subtitle="Which batter will have the best SR?">
+    <StepWrapper stepKey={7} title="Most Sixes⚡" subtitle="Which batter will have the Most sixes?">
       <PlayerList playersByTeam={battingPool} selected={form.bestStrikeRate} onSelect={v => update("bestStrikeRate", v)} />
     </StepWrapper>
   );
