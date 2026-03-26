@@ -2,15 +2,23 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Loader2, Copy, Share2 } from "lucide-react";
+import confetti from "canvas-confetti";
+import { supabase } from "@/integrations/supabase/client";
+import { teams, getTeam } from "@/data/teams";
+import { batters, bowlers, allPlayers } from "@/data/players";
+import ProgressBar from "@/components/prediction/ProgressBar";
+import StepWrapper from "@/components/prediction/StepWrapper";
+import TeamCard from "@/components/prediction/TeamCard";
+import PlayerList from "@/components/prediction/PlayerList";
+import MvpSearch from "@/components/prediction/MvpSearch";
 
 const APP_URL = "https://ipl-2026-predictions.vercel.app";
-const SHARE_TEXT = "🏏 IPL 2026 Predictions is LIVE! Pick your Winner, Top 4, MVP & more! Submit your predictions now!";
-
+const SHARE_TEXT = "🏏 IPL 2026 Predictions is LIVE!\nPick your Winner, Top 4, MVP & more!\nSubmit your predictions now!";
 const ShareButtons = () => {
   const [copied, setCopied] = useState(false);
 
   const shareWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT + "\n👉 " + APP_URL)}`, "_blank");
+    window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT + "\n👉" + APP_URL)}`, "_blank");
   };
 
   const shareInstagram = () => {
@@ -25,11 +33,11 @@ const ShareButtons = () => {
   };
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 pb-2">
       <p className="text-center text-sm text-muted-foreground mb-3 flex items-center justify-center gap-2">
         <Share2 className="w-4 h-4" /> Share with friends
       </p>
-      <div className="flex gap-3 justify-center flex-wrap">
+      <div className="flex gap-2 justify-center flex-wrap">
         <button
           onClick={shareWhatsApp}
           className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-white text-sm"
@@ -57,15 +65,6 @@ const ShareButtons = () => {
     </div>
   );
 };
-import confetti from "canvas-confetti";
-import { supabase } from "@/integrations/supabase/client";
-import { teams, getTeam } from "@/data/teams";
-import { batters, bowlers } from "@/data/players";
-import ProgressBar from "@/components/prediction/ProgressBar";
-import StepWrapper from "@/components/prediction/StepWrapper";
-import TeamCard from "@/components/prediction/TeamCard";
-import PlayerList from "@/components/prediction/PlayerList";
-import MvpSearch from "@/components/prediction/MvpSearch";
 
 const TOTAL_STEPS = 10;
 
@@ -226,7 +225,7 @@ const Predict = () => {
 />
               </div>
               <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">Mobile</label>
+                <label className="text-sm font-medium text-foreground mb-1 block">Mobile *</label>
                 <input
   type="tel"
   value={form.mobile}
@@ -234,12 +233,16 @@ const Predict = () => {
     const val = e.target.value.replace(/\D/g, "").slice(0, 10);
     update("mobile", val);
   }}
-  placeholder="Enter mobile number"
+  placeholder="Enter 10-digit mobile number"
   maxLength={10}
   className="w-full px-4 py-3 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
 />
+                {form.mobile.length > 0 && form.mobile.length < 10 && (
+                  <p className="text-xs text-destructive mt-1">{10 - form.mobile.length} more digits needed</p>
+                )}
               </div>
             </div>
+            <ShareButtons />
           </StepWrapper>
         );
       case 2:
@@ -347,7 +350,7 @@ case 7: {
     ])
   );
   return (
-    <StepWrapper stepKey={7} title="Best Strike Rate ⚡" subtitle="Which batter will have the best SR?">
+    <StepWrapper stepKey={7} title="Most Sixes⚡" subtitle="Which batter will hit most sixes?">
       <PlayerList playersByTeam={battingPool} selected={form.bestStrikeRate} onSelect={v => update("bestStrikeRate", v)} />
     </StepWrapper>
   );
@@ -373,25 +376,71 @@ case 8: {
             <MvpSearch selected={form.mvp} onSelect={v => update("mvp", v)} />
           </StepWrapper>
         );
-      case 10:
-        return (
-          <StepWrapper stepKey={10} title="Review & Submit" subtitle="Double-check your predictions">
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
-              <SummaryItem label="Name" value={form.name} />
-              {form.mobile && <SummaryItem label="Mobile" value={form.mobile} />}
-              <SummaryItem label="Winner" value={getTeam(form.winner)?.name} />
-              <SummaryItem label="Finalists" value={form.finalists.map(id => getTeam(id)?.shortName).join(" vs ")} />
-              <SummaryItem label="Top 4" value={form.top4.map(id => getTeam(id)?.shortName).join(", ")} />
-              <SummaryItem label="Most Runs" value={form.mostRuns} />
-              <SummaryItem label="Most Wickets" value={form.mostWickets} />
-              <SummaryItem label="Best SR" value={form.bestStrikeRate} />
-              <SummaryItem label="Most Dots" value={form.mostDotBalls} />
-              <SummaryItem label="MVP" value={form.mvp} />
-            </div>
-            {error && <p className="text-destructive text-sm mt-3">{error}</p>}
-            <ShareButtons />
-          </StepWrapper>
-        );
+      case 10: {
+  const winnerTeam = getTeam(form.winner);
+  const finalist1 = getTeam(form.finalists[0]);
+  const finalist2 = getTeam(form.finalists[1]);
+  const top4Teams = form.top4.map(id => getTeam(id));
+  const mvpPlayer = allPlayers.find(p => p.name === form.mvp);
+  const mostRunsPlayer = allPlayers.find(p => p.name === form.mostRuns);
+  const mostWicketsPlayer = allPlayers.find(p => p.name === form.mostWickets);
+  const mostSixesPlayer = allPlayers.find(p => p.name === form.bestStrikeRate);
+  const mostDotsPlayer = allPlayers.find(p => p.name === form.mostDotBalls);
+
+  return (
+    <StepWrapper stepKey={10} title="Review & Submit" subtitle="Double-check your predictions">
+      <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+        <SummaryItem label="Name" value={form.name} />
+        {form.mobile && <SummaryItem label="Mobile" value={form.mobile} />}
+
+        {/* Winner */}
+        <SummaryItemWithImage
+          label="Winner 🏆"
+          value={winnerTeam?.name}
+          image={winnerTeam?.logo}
+          round
+        />
+
+        {/* Finalists */}
+<div className="flex justify-between items-center bg-secondary rounded-lg px-4 py-3">
+  <span className="text-sm text-muted-foreground">Finalists ⚔️</span>
+  <div className="flex items-center gap-2">
+    {[finalist1, finalist2].map((t, i) => t ? (
+      <div key={i} className="flex items-center gap-1">
+        <img src={t.logo} alt={t.shortName} className="w-6 h-6 object-contain rounded-full bg-background border border-border"
+          onError={e => (e.currentTarget.style.display = "none")} />
+        <span className="text-sm font-semibold text-foreground">{t.shortName}</span>
+        {i === 0 && <span className="text-xs text-muted-foreground mx-1">vs</span>}
+      </div>
+    ) : null)}
+  </div>
+</div>
+
+{/* Top 4 */}
+<div className="flex justify-between items-center bg-secondary rounded-lg px-4 py-3">
+  <span className="text-sm text-muted-foreground">Top 4 🏅</span>
+  <div className="flex items-center gap-2">
+    {top4Teams.map((t, i) => t ? (
+      <div key={i} className="flex items-center gap-1">
+        <img src={t.logo} alt={t.shortName} className="w-6 h-6 object-contain rounded-full bg-background border border-border"
+          onError={e => (e.currentTarget.style.display = "none")} />
+        <span className="text-xs font-semibold text-foreground">{t.shortName}</span>
+      </div>
+    ) : null)}
+  </div>
+</div>
+
+        {/* Player rows */}
+        <SummaryItemWithImage label="Most Runs 🏏" value={mostRunsPlayer?.name} image={mostRunsPlayer?.image} />
+        <SummaryItemWithImage label="Most Wickets 🎳" value={mostWicketsPlayer?.name} image={mostWicketsPlayer?.image} />
+        <SummaryItemWithImage label="Most Sixes ⚡" value={mostSixesPlayer?.name} image={mostSixesPlayer?.image} />
+        <SummaryItemWithImage label="Most Dots 🎯" value={mostDotsPlayer?.name} image={mostDotsPlayer?.image} />
+        <SummaryItemWithImage label="MVP 🌟" value={mvpPlayer?.name} image={mvpPlayer?.image} />
+      </div>
+      {error && <p className="text-destructive text-sm mt-3">{error}</p>}
+    </StepWrapper>
+  );
+}
     }
   };
 
@@ -443,6 +492,18 @@ const SummaryItem = ({ label, value }: { label: string; value?: string }) => (
   <div className="flex justify-between items-center bg-secondary rounded-lg px-4 py-3">
     <span className="text-sm text-muted-foreground">{label}</span>
     <span className="text-sm font-semibold text-foreground text-right max-w-[60%]">{value}</span>
+  </div>
+);
+const SummaryItemWithImage = ({ label, value, image, round }: { label: string; value?: string; image?: string; round?: boolean }) => (
+  <div className="flex justify-between items-center bg-secondary rounded-lg px-4 py-3">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2 max-w-[60%]">
+      {image && (
+        <img src={image} alt={value} className="w-8 h-8 object-cover rounded-full border border-border flex-shrink-0"
+          onError={e => (e.currentTarget.style.display = "none")} />
+      )}
+      <span className="text-sm font-semibold text-foreground text-right leading-tight">{value}</span>
+    </div>
   </div>
 );
 
